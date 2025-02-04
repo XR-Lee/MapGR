@@ -143,7 +143,7 @@ class MapTRDecoder(TransformerLayerSequence):
                     nn.Linear(512, 256))
             
             global_map = nn.Sequential(
-                    nn.ConvTranspose2d(50,32,kernel_size=3, stride=2,padding=1),
+                    nn.ConvTranspose2d(100,32,kernel_size=3, stride=2,padding=1),
                     #nn.BatchNorm2d(32),
                     nn.LeakyReLU(),
                     #nn.ConvTranspose2d(32,32,kernel_size=3, stride=2,padding=1),
@@ -245,13 +245,13 @@ class MapTRDecoder(TransformerLayerSequence):
             # num_vec = output.shape[0] // 20
             # global_embed = self.global_embed.weight[ii*64:(ii+1)*64]
             
-            tmp = output.permute(1, 0, 2)[:,:1000,:] #.view(bs,num_vec, num_pts_per_vec,-1)[:,:num_vec_one2one,:,:]
+            tmp = output.permute(1, 0, 2)[:,:1500,:] #.view(bs,num_vec, num_pts_per_vec,-1)[:,:num_vec_one2one,:,:]
             tmp = tmp.detach() * 0.8 + tmp * 0.2
            
-            qu = torch.mean(tmp.view(bs, 50, -1, 256), dim=2)
+            qu = torch.mean(tmp.view(bs, 100, -1, 256), dim=2)
             # qu mlp -> mean -> mlp -> cat -> mlp
             global_map = self.global_dec[ii](qu)    
-            global_map = self.global_map[ii](global_map.view(-1,50,64,32))
+            global_map = self.global_map[ii](global_map.view(-1,100,64,32))
             global_map_rec.append(F.interpolate(global_map, (200,100), mode='bilinear'))
             
             global_emb = self.global_dec_guide[ii](global_map.view(1, bs, -1)).repeat(output.shape[0],1,1)
@@ -628,7 +628,7 @@ class DecoupledDetrTransformerDecoderLayer(BaseTransformerLayer):
     def __init__(self,
                  attn_cfgs,
                  feedforward_channels,
-                 num_vec=50,
+                 num_vec=100,
                  num_pts_per_vec=20,
                  ffn_dropout=0.0,
                  operation_order=None,
