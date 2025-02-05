@@ -245,7 +245,7 @@ class MapTRDecoder(TransformerLayerSequence):
             # num_vec = output.shape[0] // 20
             # global_embed = self.global_embed.weight[ii*64:(ii+1)*64]
             
-            tmp = output.permute(1, 0, 2)[:,:1500,:] #.view(bs,num_vec, num_pts_per_vec,-1)[:,:num_vec_one2one,:,:]
+            tmp = output.permute(1, 0, 2)[:,:2000,:] #.view(bs,num_vec, num_pts_per_vec,-1)[:,:num_vec_one2one,:,:]
             tmp = tmp.detach() * 0.8 + tmp * 0.2
            
             qu = torch.mean(tmp.view(bs, 100, -1, 256), dim=2)

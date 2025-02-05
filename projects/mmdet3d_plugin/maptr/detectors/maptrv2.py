@@ -155,7 +155,7 @@ class MapTRv2(MVXTwoStageDetector):
             losses.update(loss_depth=loss_depth)
 
         loss_inputs = [gt_bboxes_3d, gt_labels_3d, gt_seg_mask, gt_pv_seg_mask, outs]
-        losses_pts = self.pts_bbox_head.loss(*loss_inputs, img_metas=img_metas)
+        losses_pts = self.pts_bbox_head.loss(*loss_inputs, img_metas=img_metas, one_to_many=False)
         losses.update(losses_pts)
         # import ipdb;ipdb.set_trace()
         k_one2many = self.pts_bbox_head.k_one2many
@@ -168,7 +168,7 @@ class MapTRv2(MVXTwoStageDetector):
         # import ipdb;ipdb.set_trace()
         one2many_outs = outs['one2many_outs']
         loss_one2many_inputs = [multi_gt_bboxes_3d, multi_gt_labels_3d, gt_seg_mask, gt_pv_seg_mask, one2many_outs]
-        loss_dict_one2many = self.pts_bbox_head.loss(*loss_one2many_inputs, img_metas=img_metas)
+        loss_dict_one2many = self.pts_bbox_head.loss(*loss_one2many_inputs, img_metas=img_metas, one_to_many=True)
 
         lambda_one2many = self.pts_bbox_head.lambda_one2many
         for key, value in loss_dict_one2many.items():
