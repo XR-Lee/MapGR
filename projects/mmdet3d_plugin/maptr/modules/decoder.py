@@ -128,26 +128,32 @@ class MapTRDecoder(TransformerLayerSequence):
             global_decoder = nn.Sequential(
                     nn.Linear(256, 512),
                     nn.LeakyReLU(),
+                    # nn.Dropout(p=0.1),
                     nn.Linear(512, 512),
                     nn.LeakyReLU(),
+                    # nn.Dropout(p=0.1),
                     nn.Linear(512, 2048))
             
             global_guide = nn.Sequential(
                     nn.Linear(127*63, 512),
                     nn.LeakyReLU(),
+                    # nn.Dropout(p=0.1),
                     nn.Linear(512, 512))
             
             global_guide_off = nn.Sequential(
                     nn.Linear(512 + 256, 512),
                     nn.LeakyReLU(),
+                    # nn.Dropout(p=0.1),
                     nn.Linear(512, 256))
             
             global_map = nn.Sequential(
                     nn.ConvTranspose2d(100,32,kernel_size=3, stride=2,padding=1),
+                    # nn.BatchNorm2d(32), 
                     #nn.BatchNorm2d(32),
                     nn.LeakyReLU(),
                     #nn.ConvTranspose2d(32,32,kernel_size=3, stride=2,padding=1),
                     nn.Conv2d(32,32,kernel_size=3,padding=1),
+                    # nn.BatchNorm2d(32),
                     #nn.LayerNorm(1024),
                     nn.LeakyReLU(),
                     nn.Conv2d(32,1,kernel_size=3,padding=1))

@@ -447,11 +447,23 @@ class MapTRv2Head(DETRHead):
                 outputs_pv_seg = self.pv_seg_head(mlvl_feats[-1].flatten(0,1))
                 outputs_pv_seg = outputs_pv_seg.view(bs, num_cam, -1, feat_h, feat_w)
 
+        consis_loss_new = torch.mean(torch.abs(outputs_pts_coords_one2one[1:,...]-outputs_pts_coords_one2one[:-1,...]), dim=(3,4))
+        outputs_classes_one2one_tmp = outputs_classes_one2one.clone()
+        # logits 
+        outputs_classes_one2one_tmp[:,:,:,1] = outputs_classes_one2one_tmp[:,:,:,1] - 10000.
+        max_class_pred = torch.max(outputs_classes_one2one_tmp[1:,...], dim=3)[0]
+        knd_value = torch.min(torch.topk(max_class_pred, 60, dim=2)[0], dim=2)[0].unsqueeze(2)
+        mask = max_class_pred > knd_value
+        #print(max_class_pred.shape, knd_value.shape, mask.shape, consis_loss_new.shape, " < >dew " * 3)
+        # weights of loss
+        consis_loss_new = torch.mean(consis_loss_new[4:,...][mask[4:,...]]) * 10.
+
         outs = {
             'bev_embed': bev_embed,
             'all_cls_scores': outputs_classes_one2one,
             'all_bbox_preds': outputs_coords_one2one,
             'all_pts_preds': outputs_pts_coords_one2one,
+            'consis_new': consis_loss_new,
             'enc_cls_scores': None,
             'enc_bbox_preds': None,
             'enc_pts_preds': None,
