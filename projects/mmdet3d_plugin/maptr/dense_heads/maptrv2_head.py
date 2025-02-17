@@ -247,14 +247,14 @@ class MapTRv2Head(DETRHead):
                     nn.Conv2d(self.embed_dims, self.embed_dims, kernel_size=3, padding=1, bias=False),
                     # nn.BatchNorm2d(128),
                     nn.ReLU(inplace=True),
-                    nn.Conv2d(self.embed_dims, self.aux_seg['seg_classes'], kernel_size=1, padding=0)
+                    nn.Conv2d(self.embed_dims, 1, kernel_size=1, padding=0)
                 )
             if self.aux_seg['pv_seg']:            
                 self.pv_seg_head = nn.Sequential(
                     nn.Conv2d(self.embed_dims, self.embed_dims, kernel_size=3, padding=1, bias=False),
                     # nn.BatchNorm2d(128),
                     nn.ReLU(inplace=True),
-                    nn.Conv2d(self.embed_dims, self.aux_seg['seg_classes'], kernel_size=1, padding=0)
+                    nn.Conv2d(self.embed_dims, 1, kernel_size=1, padding=0)
                 )
 
         if not self.as_two_stage:
@@ -447,23 +447,23 @@ class MapTRv2Head(DETRHead):
                 outputs_pv_seg = self.pv_seg_head(mlvl_feats[-1].flatten(0,1))
                 outputs_pv_seg = outputs_pv_seg.view(bs, num_cam, -1, feat_h, feat_w)
 
-        consis_loss_new = torch.mean(torch.abs(outputs_pts_coords_one2one[1:,...]-outputs_pts_coords_one2one[:-1,...]), dim=(3,4))
-        outputs_classes_one2one_tmp = outputs_classes_one2one.clone()
+        # consis_loss_new = torch.mean(torch.abs(outputs_pts_coords_one2one[1:,...]-outputs_pts_coords_one2one[:-1,...]), dim=(3,4))
+        # outputs_classes_one2one_tmp = outputs_classes_one2one.clone()
         # logits 
-        outputs_classes_one2one_tmp[:,:,:,1] = outputs_classes_one2one_tmp[:,:,:,1] - 10000.
-        max_class_pred = torch.max(outputs_classes_one2one_tmp[1:,...], dim=3)[0]
-        knd_value = torch.min(torch.topk(max_class_pred, 60, dim=2)[0], dim=2)[0].unsqueeze(2)
-        mask = max_class_pred > knd_value
+        # outputs_classes_one2one_tmp[:,:,:,1] = outputs_classes_one2one_tmp[:,:,:,1] - 10000.
+        # max_class_pred = torch.max(outputs_classes_one2one_tmp[1:,...], dim=3)[0]
+        # knd_value = torch.min(torch.topk(max_class_pred, 60, dim=2)[0], dim=2)[0].unsqueeze(2)
+        # mask = max_class_pred > knd_value
         #print(max_class_pred.shape, knd_value.shape, mask.shape, consis_loss_new.shape, " < >dew " * 3)
         # weights of loss
-        consis_loss_new = torch.mean(consis_loss_new[4:,...][mask[4:,...]]) * 10.
+        # consis_loss_new = torch.mean(consis_loss_new[4:,...][mask[4:,...]]) * 10.
 
         outs = {
             'bev_embed': bev_embed,
             'all_cls_scores': outputs_classes_one2one,
             'all_bbox_preds': outputs_coords_one2one,
             'all_pts_preds': outputs_pts_coords_one2one,
-            'consis_new': consis_loss_new,
+            # 'consis_new': consis_loss_new,
             'enc_cls_scores': None,
             'enc_bbox_preds': None,
             'enc_pts_preds': None,
@@ -905,7 +905,7 @@ class MapTRv2Head(DETRHead):
                         #print(global_map.shape, seg_output.shape, seg_gt.shape)
                 #print(torch.unique(seg_output), torch.unique(global_map_rec[0]), torch.unique(seg_gt.float()), torch.unique(seg_gt_low_res), "<> " * 3)
 
-                    loss_seg = self.loss_seg(seg_output, seg_gt.float())
+                    loss_seg = self.loss_seg(seg_output, seg_gt.max(dim=1,keepdim=True)[0].float())
                     loss_dict['loss_seg'] = loss_seg
             if self.aux_seg['pv_seg']:
                 # import ipdb;ipdb.set_trace()
@@ -913,7 +913,7 @@ class MapTRv2Head(DETRHead):
                     pv_seg_output = preds_dicts['pv_seg']
                     num_imgs = pv_seg_output.size(0)
                     pv_seg_gt = torch.stack([gt_pv_seg_mask[i] for i in range(num_imgs)],dim=0)
-                    loss_pv_seg = self.loss_pv_seg(pv_seg_output, pv_seg_gt.float())
+                    loss_pv_seg = self.loss_pv_seg(pv_seg_output, pv_seg_gt.max(dim=2,keepdim=True)[0].float())
                     loss_dict['loss_pv_seg'] = loss_pv_seg
         # loss of proposal generated from encode feature map.
         if enc_cls_scores is not None:

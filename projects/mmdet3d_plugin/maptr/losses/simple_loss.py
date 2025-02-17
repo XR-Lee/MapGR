@@ -83,6 +83,19 @@ class SimpleLoss(torch.nn.Module):
         return loss*self.loss_weight
 
 @LOSSES.register_module()
+class SimpleCELoss(torch.nn.Module):
+    def __init__(self, loss_weight):
+        super(SimpleCELoss, self).__init__()
+        self.loss_fn = torch.nn.CrossEntropyLoss()
+        self.loss_weight = loss_weight
+
+    def forward(self, ypred, ytgt):
+        # import ipdb;ipdb.set_trace()
+        loss = self.loss_fn(ypred, ytgt)
+        return loss*self.loss_weight
+
+
+@LOSSES.register_module()
 class MaskFocalLoss(FocalLoss):
     def __init__(self,**kwargs):
         super(MaskFocalLoss, self).__init__(**kwargs)
