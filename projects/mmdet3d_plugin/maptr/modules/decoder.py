@@ -79,6 +79,8 @@ class MapTRDecoder(TransformerLayerSequence):
                  query_pos_embedding='none',
                  num_pts_per_vec=20,
                  pt_dim=2,
+                 detach_weights = [0.8, 0.2],
+                 queru_mask_num = 700,
                  **kwargs):
         super(MapTRDecoder, self).__init__(*args, **kwargs)
         self.return_intermediate = return_intermediate
@@ -175,7 +177,8 @@ class MapTRDecoder(TransformerLayerSequence):
         self.global_map = nn.ModuleList(self.global_map)
         self.global_dec_guide = nn.ModuleList(self.global_dec_guide)
         self.global_dec_guide_offest = nn.ModuleList(self.global_dec_guide_offest)
-
+        self.detach_weights = detach_weights
+        self.queru_mask_num = queru_mask_num
         # self.mask_emb = nn.Sequential(
                     # nn.Linear(1, 512),
                     # nn.LeakyReLU(),
@@ -250,10 +253,11 @@ class MapTRDecoder(TransformerLayerSequence):
             # num_pts_per_vec = 20
             # num_vec = output.shape[0] // 20
             # global_embed = self.global_embed.weight[ii*64:(ii+1)*64]
-            
-            tmp = output.permute(1, 0, 2)[:,:2000,:] #.view(bs,num_vec, num_pts_per_vec,-1)[:,:num_vec_one2one,:,:]
-            tmp = tmp.detach() * 0.8 + tmp * 0.2
-           
+            #  self.queru_mask_num = 2000
+            # print(output.shape)
+            tmp = output.permute(1, 0, 2)[:,:self.queru_mask_num,:] #.view(bs,num_vec, num_pts_per_vec,-1)[:,:num_vec_one2one,:,:]
+            tmp = tmp.detach() * self.detach_weights[0] + tmp * self.detach_weights[1]
+            # self.detach_weights = [0.8, 0.2]
             # print("-----------------------------")
             # print(output.shape) [700, 8, 256]
 
