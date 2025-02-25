@@ -256,14 +256,15 @@ class MapTRDecoder(TransformerLayerSequence):
             #  self.queru_mask_num = 2000
             # print(output.shape)
             tmp = output.permute(1, 0, 2)[:,:self.queru_mask_num,:] #.view(bs,num_vec, num_pts_per_vec,-1)[:,:num_vec_one2one,:,:]
+            # tmp = tmp.detach() * self.detach_weights[0] + tmp * self.detach_weights[1]
             tmp = tmp.detach() * self.detach_weights[0] + tmp * self.detach_weights[1]
-            # self.detach_weights = [0.8, 0.2]
             # print("-----------------------------")
             # print(output.shape) [700, 8, 256]
-
-            qu = torch.mean(tmp.view(bs, 100, -1, 256), dim=2)
+            
+            # qu = tmp.view(bs, 100, -1, 256)
+            # qu = torch.mean(tmp.view(bs, 100, -1, 256), dim=2)
             # qu mlp -> mean -> mlp -> cat -> mlp
-            global_map = self.global_dec[ii](qu)    
+            global_map = self.global_dec[ii](tmp)    
             global_map = self.global_map[ii](global_map.view(-1,100,64,32))
             # print("-----------------------------")
             # print(global_map.shape)
