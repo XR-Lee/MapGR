@@ -625,6 +625,7 @@ class VectorizedAV2LocalMap(object):
                         else:
                             print(instance.geom_type)
             else:
+                img_shape = example['img_metas'].data['pad_shape'][0]
                 if self.aux_seg['bev_seg']:
                     gt_semantic_mask = np.zeros((len(self.vec_classes), self.canvas_size[0], self.canvas_size[1]), dtype=np.uint8)
                 else:

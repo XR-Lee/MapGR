@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 CONFIG=$1
 GPUS=$2
-PORT=${PORT:-28509}
+PORT=${PORT:-28609}
 
 # CUDA_VISIBLE_DEVICES=4,5,6,7 \
 PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \

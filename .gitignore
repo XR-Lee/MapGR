@@ -10,6 +10,8 @@ __pycache__/
 # C extensions
 *.so
 
+vis_seg/
+pkls/
 # Distribution / packaging
 work_dirs
 test

@@ -231,8 +231,8 @@ def main():
         pts_filename = osp.basename(pts_filename)
         pts_filename = pts_filename.replace('__LIDAR_TOP__', '_').split('.')[0]
         # import pdb;pdb.set_trace()
-        if pts_filename not in CANDIDATE:
-            continue
+        # if pts_filename not in CANDIDATE:
+        #     continue
 
         with torch.no_grad():
             result = model(return_loss=False, rescale=True, **data)

@@ -11,7 +11,8 @@ from mmdet.models.utils.transformer import inverse_sigmoid
 from mmdet.core.bbox.transforms import bbox_xyxy_to_cxcywh, bbox_cxcywh_to_xyxy
 from mmdet.core import (multi_apply, multi_apply, reduce_mean)
 from mmcv.utils import TORCH_VERSION, digit_version
-
+import numpy as np
+import cv2
 def denormalize_3d_pts(pts, pc_range):
     new_pts = pts.clone()
     new_pts[...,0:1] = (pts[..., 0:1]*(pc_range[3] -
@@ -172,6 +173,7 @@ class MapTRv2Head(DETRHead):
         self.dir_interval = dir_interval
         self.aux_seg = aux_seg
         self.z_cfg = z_cfg
+        self.counter = 0 
         
         super(MapTRv2Head, self).__init__(
             *args, transformer=transformer, **kwargs)
@@ -384,6 +386,9 @@ class MapTRv2Head(DETRHead):
         outputs_classes_one2many = []
         outputs_coords_one2many = []
         outputs_pts_coords_one2many = []
+
+        # import pickle
+        # self.counter += 1
         for lvl in range(hs.shape[0]):
             if lvl == 0:
                 if self.query_embed_type == 'instance':
@@ -419,6 +424,15 @@ class MapTRv2Head(DETRHead):
             # tmp = tmp[..., 0:2] if not self.z_cfg['gt_z_flag'] else tmp[..., 0:3]
             # TODO: check if using sigmoid
             outputs_coord, outputs_pts_coord = self.transform_box(tmp,num_vec=num_vec)
+            # with open(f'pkls/{self.counter}_{lvl}_cord.pkl' ,'wb') as file:
+            #     print('saving'+f'pkls/{self.counter}_ {lvl}_cord.pkl')
+            #     pickle.dump(outputs_coord,file)
+            # with open(f'pkls/{self.counter}_{lvl}_cord_pts.pkl' ,'wb') as file:
+            #     print('saving'+f'pkls/{self.counter}_ {lvl}_cord_pts.pkl')
+            #     pickle.dump(outputs_pts_coord,file)
+            # with open(f'pkls/{self.counter}_{lvl}_cls.pkl' ,'wb') as file:
+            #     print('saving'+f'pkls/{self.counter}_ {lvl}_cls.pkl')
+            #     pickle.dump(outputs_coord[:, 0:self.num_vec_one2one],file)
 
             outputs_classes_one2one.append(outputs_class[:, 0:self.num_vec_one2one])
             outputs_coords_one2one.append(outputs_coord[:, 0:self.num_vec_one2one])
@@ -891,11 +905,12 @@ class MapTRv2Head(DETRHead):
                     # seg_gt_low_res = seg_gt_low_res.float()
                     #seg_gt_mask = F.interpolate(seg_gt_mask, (64,32), mode='nearest')
 
-                    # rand_id = np.random.randint(10000)
-                    # cv2.imwrite(str(rand_id) + "_low_res_.png", seg_gt_low_res[0,0,:,:].cpu().numpy() * 200)
-                    # cv2.imwrite(str(rand_id) + "_raw_.png", seg_gt[0,0,:,:].cpu().numpy() * 200)
-                    # cv2.imwrite(str(rand_id) + "_pred_.png", global_map_rec[0].view(-1,1,32,32)[0,0,:,:].sigmoid().detach().cpu().numpy() * 200)
-
+                        # rand_id = np.random.randint(10000)
+                        # path="/app/MapQR/vis_seg/"
+                        # cv2.imwrite( path +str(rand_id) + "_1_.png", seg_gt[0,0,:,:].cpu().numpy() * 200)
+                        # cv2.imwrite( path +str(rand_id) + "_2_.png", seg_gt[0,1,:,:].cpu().numpy() * 200)
+                        # cv2.imwrite( path +str(rand_id) + "_3_.png", seg_gt[0,2,:,:].cpu().numpy() * 200)
+                        # cv2.imwrite( path +str(rand_id) + "_all_.png", seg_gt.max(dim=1,keepdim=True)[0][0,0,:,:].cpu().numpy() * 200)
                         layer_count = 0
                         for global_map in global_map_rec:
                             #print(global_map.shape, seg_gt_mask.shape, " <> " * 4)
@@ -941,7 +956,7 @@ class MapTRv2Head(DETRHead):
         if one_to_many:
             weight_layer = [1.,1.,1.0,1.0,1.0,1.0]
         else:
-            weight_layer = [.1,.1,1.0,1.0,1.0,1.0]
+            weight_layer = [.25,.25,1.0,1.0,1.0,1.0]
         num_dec_layer = 0
         for loss_cls_i, loss_bbox_i, loss_iou_i, loss_pts_i, loss_dir_i in zip(losses_cls[:-1],
                                            losses_bbox[:-1],

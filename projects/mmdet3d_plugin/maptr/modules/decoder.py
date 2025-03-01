@@ -128,6 +128,7 @@ class MapTRDecoder(TransformerLayerSequence):
         self.global_dec_guide_offest = []
         for i in range(6):            
             global_decoder = nn.Sequential(
+                    nn.LayerNorm(256),
                     nn.Linear(256, 512),
                     nn.LeakyReLU(),
                     # nn.Dropout(p=0.1),
@@ -265,10 +266,17 @@ class MapTRDecoder(TransformerLayerSequence):
             # qu = torch.mean(tmp.view(bs, 100, -1, 256), dim=2)
             # qu mlp -> mean -> mlp -> cat -> mlp
             global_map = self.global_dec[ii](tmp)    
-            global_map = self.global_map[ii](global_map.view(-1,100,64,32))
-            # print("-----------------------------")
-            # print(global_map.shape)
-            global_map_rec.append(F.interpolate(global_map, (200,100), mode='bilinear'))
+
+            # global_map = self.global_map[ii](global_map.view(-1,100,64,32))
+            # global_map_rec.append(F.interpolate(global_map, (200,100), mode='bilinear'))
+
+
+            # av2
+            global_map = self.global_map[ii](global_map.view(-1,100,32,64))
+            global_map_rec.append(F.interpolate(global_map, (100,200), mode='bilinear'))
+            # av2 
+            
+
             
            
             global_emb = self.global_dec_guide[ii](global_map.view(1, bs, -1)).repeat(output.shape[0],1,1)
