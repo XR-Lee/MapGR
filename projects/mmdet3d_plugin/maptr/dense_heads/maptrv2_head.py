@@ -955,8 +955,10 @@ class MapTRv2Head(DETRHead):
         # loss from other decoder layers
         if one_to_many:
             weight_layer = [1.,1.,1.0,1.0,1.0,1.0]
+        # loss weight for affected layers
         else:
-            weight_layer = [.25,.25,1.0,1.0,1.0,1.0]
+            # weight_layer = [.05,.05,1.0,1.0,1.0,1.0]
+            weight_layer = [.1,.1,1.0,1.0,1.0,1.0]
         num_dec_layer = 0
         for loss_cls_i, loss_bbox_i, loss_iou_i, loss_pts_i, loss_dir_i in zip(losses_cls[:-1],
                                            losses_bbox[:-1],

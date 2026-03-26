@@ -137,17 +137,17 @@ class MapTRDecoder(TransformerLayerSequence):
                     # nn.Dropout(p=0.1),
                     nn.Linear(512, 2048))
             
-            global_guide = nn.Sequential(
-                    nn.Linear(127*63*3, 512),
-                    nn.LeakyReLU(),
-                    # nn.Dropout(p=0.1),
-                    nn.Linear(512, 512))
+            # global_guide = nn.Sequential(
+            #         nn.Linear(127*63*3, 512),
+            #         nn.LeakyReLU(),
+            #         # nn.Dropout(p=0.1),
+            #         nn.Linear(512, 512))
             
-            global_guide_off = nn.Sequential(
-                    nn.Linear(512 + 256, 512),
-                    nn.LeakyReLU(),
-                    # nn.Dropout(p=0.1),
-                    nn.Linear(512, 256))
+            # global_guide_off = nn.Sequential(
+            #         nn.Linear(512 + 256, 512),
+            #         nn.LeakyReLU(),
+            #         # nn.Dropout(p=0.1),
+            #         nn.Linear(512, 256))
             
             global_map = nn.Sequential(
                     nn.ConvTranspose2d(100,32,kernel_size=3, stride=2,padding=1),
@@ -172,12 +172,12 @@ class MapTRDecoder(TransformerLayerSequence):
 
             self.global_dec.append(global_decoder)
             self.global_map.append(global_map)
-            self.global_dec_guide.append(global_guide)
-            self.global_dec_guide_offest.append(global_guide_off)
+            # self.global_dec_guide.append(global_guide)
+            # self.global_dec_guide_offest.append(global_guide_off)
         self.global_dec = nn.ModuleList(self.global_dec)
         self.global_map = nn.ModuleList(self.global_map)
-        self.global_dec_guide = nn.ModuleList(self.global_dec_guide)
-        self.global_dec_guide_offest = nn.ModuleList(self.global_dec_guide_offest)
+        # self.global_dec_guide = nn.ModuleList(self.global_dec_guide)
+        # self.global_dec_guide_offest = nn.ModuleList(self.global_dec_guide_offest)
         self.detach_weights = detach_weights
         self.queru_mask_num = queru_mask_num
         # self.mask_emb = nn.Sequential(
@@ -267,21 +267,21 @@ class MapTRDecoder(TransformerLayerSequence):
             # qu mlp -> mean -> mlp -> cat -> mlp
             global_map = self.global_dec[ii](tmp)    
 
-            # global_map = self.global_map[ii](global_map.view(-1,100,64,32))
-            # global_map_rec.append(F.interpolate(global_map, (200,100), mode='bilinear'))
+            global_map = self.global_map[ii](global_map.view(-1,100,64,32))
+            global_map_rec.append(F.interpolate(global_map, (200,100), mode='bilinear'))
 
 
             # av2
-            global_map = self.global_map[ii](global_map.view(-1,100,32,64))
-            global_map_rec.append(F.interpolate(global_map, (100,200), mode='bilinear'))
+            # global_map = self.global_map[ii](global_map.view(-1,100,32,64))
+            # global_map_rec.append(F.interpolate(global_map, (100,200), mode='bilinear'))
             # av2 
             
 
             
            
-            global_emb = self.global_dec_guide[ii](global_map.view(1, bs, -1)).repeat(output.shape[0],1,1)
-            res = self.global_dec_guide_offest[ii](torch.cat([output, global_emb], dim=2))
-            output = output + res
+            # global_emb = self.global_dec_guide[ii](global_map.view(1, bs, -1)).repeat(output.shape[0],1,1)
+            # res = self.global_dec_guide_offest[ii](torch.cat([output, global_emb], dim=2))
+            # output = output + res
             #########################################################
             output = output.permute(1, 0, 2)
 
