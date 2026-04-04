@@ -590,17 +590,19 @@ class VectorizedLocalMap(object):
         gt_pts_num_3d = []
         gt_labels = []
         gt_instance = []
+        hires_scale = self.aux_seg.get('hires_scale', 4)
+        gt_high_res_semantic_mask = None
+
         if self.aux_seg['use_aux_seg']:
             if self.aux_seg['seg_classes'] == 1:
                 if self.aux_seg['bev_seg']:
                     gt_semantic_mask = np.zeros((1, self.canvas_size[0], self.canvas_size[1]), dtype=np.uint8)
+                    gt_high_res_semantic_mask = np.zeros((1, self.canvas_size[0]*hires_scale, self.canvas_size[1]*hires_scale), dtype=np.uint8)
                 else:
                     gt_semantic_mask = None
-                # import ipdb;ipdb.set_trace()
                 if self.aux_seg['pv_seg']:
                     num_cam  = len(example['img_metas'].data['pad_shape'])
                     img_shape = example['img_metas'].data['pad_shape'][0]
-                    # import ipdb;ipdb.set_trace()
                     gt_pv_semantic_mask = np.zeros((num_cam, 1, img_shape[0] // feat_down_sample, img_shape[1] // feat_down_sample), dtype=np.uint8)
                     lidar2img = example['img_metas'].data['lidar2img']
                     scale_factor = np.eye(4)
@@ -609,6 +611,7 @@ class VectorizedLocalMap(object):
                     lidar2feat = [scale_factor @ l2i for l2i in lidar2img]
                 else:
                     gt_pv_semantic_mask = None
+                hires_thickness = max(1, int(self.thickness * hires_scale))
                 for instance, instance_type in vectors:
                     if instance_type != -1:
                         gt_instance.append(instance)
@@ -616,6 +619,7 @@ class VectorizedLocalMap(object):
                         if instance.geom_type == 'LineString':
                             if self.aux_seg['bev_seg']:
                                 self.line_ego_to_mask(instance, gt_semantic_mask[0], color=1, thickness=self.thickness)
+                                self.line_ego_to_mask(instance, gt_high_res_semantic_mask[0], color=1, thickness=hires_thickness)
                             if self.aux_seg['pv_seg']:
                                 for cam_index in range(num_cam):
                                     self.line_ego_to_pvmask(instance, gt_pv_semantic_mask[cam_index][0], lidar2feat[cam_index],color=1, thickness=self.aux_seg['pv_thickness'])
@@ -624,6 +628,7 @@ class VectorizedLocalMap(object):
             else:
                 if self.aux_seg['bev_seg']:
                     gt_semantic_mask = np.zeros((len(self.vec_classes), self.canvas_size[0], self.canvas_size[1]), dtype=np.uint8)
+                    gt_high_res_semantic_mask = np.zeros((len(self.vec_classes), self.canvas_size[0]*hires_scale, self.canvas_size[1]*hires_scale), dtype=np.uint8)
                 else:
                     gt_semantic_mask = None
                 if self.aux_seg['pv_seg']:
@@ -637,6 +642,7 @@ class VectorizedLocalMap(object):
                     lidar2feat = [scale_factor @ l2i for l2i in lidar2img]
                 else:
                     gt_pv_semantic_mask = None
+                hires_thickness = 1
                 for instance, instance_type in vectors:
                     if instance_type != -1:
                         gt_instance.append(instance)
@@ -644,6 +650,7 @@ class VectorizedLocalMap(object):
                         if instance.geom_type == 'LineString':
                             if self.aux_seg['bev_seg']:
                                 self.line_ego_to_mask(instance, gt_semantic_mask[instance_type], color=1, thickness=self.thickness)
+                                self.line_ego_to_mask(instance, gt_high_res_semantic_mask[instance_type], color=1, thickness=hires_thickness)
                             if self.aux_seg['pv_seg']:
                                 for cam_index in range(num_cam):
                                     self.line_ego_to_pvmask(instance, gt_pv_semantic_mask[cam_index][instance_type], lidar2feat[cam_index],color=1, thickness=self.aux_seg['pv_thickness'])
@@ -664,8 +671,21 @@ class VectorizedLocalMap(object):
             gt_vecs_pts_loc=gt_instance,
             gt_vecs_label=gt_labels,
             gt_semantic_mask=gt_semantic_mask,
+            gt_high_res_semantic_mask=gt_high_res_semantic_mask,
             gt_pv_semantic_mask=gt_pv_semantic_mask,
         )
+        # #region agent log
+        try:
+            import json as _json, time as _time
+            _lo_shape = list(gt_semantic_mask.shape) if gt_semantic_mask is not None else None
+            _hi_shape = list(gt_high_res_semantic_mask.shape) if gt_high_res_semantic_mask is not None else None
+            _lo_sum = int(gt_semantic_mask.sum()) if gt_semantic_mask is not None else 0
+            _hi_sum = int(gt_high_res_semantic_mask.sum()) if gt_high_res_semantic_mask is not None else 0
+            with open('/data2/file_swap/lrk_space/.cursor/debug-0f96ed.log', 'a') as _f:
+                _f.write(_json.dumps({"sessionId":"0f96ed","hypothesisId":"mask_gen","location":"nuscenes_offlinemap_dataset.py:gen_vectorized_samples","message":"mask_shapes","data":{"lo_shape":_lo_shape,"hi_shape":_hi_shape,"lo_sum":_lo_sum,"hi_sum":_hi_sum},"timestamp":int(_time.time()*1000)}) + '\n')
+        except Exception:
+            pass
+        # #endregion
         return anns_results
     def line_ego_to_pvmask(self,
                           line_ego, 
@@ -691,18 +711,16 @@ class VectorizedLocalMap(object):
                          thickness=3):
         ''' Rasterize a single line to mask.
         
-        Args:
-            line_ego (LineString): line
-            mask (array): semantic mask to paint on
-            color (int): positive label, default: 1
-            thickness (int): thickness of rasterized lines, default: 3
+        Scale and offset are derived from the mask's actual shape so that
+        the same method works for both standard and high-resolution masks.
         '''
-
-        trans_x = self.canvas_size[1] / 2
-        trans_y = self.canvas_size[0] / 2
-        line_ego = affinity.scale(line_ego, self.scale_x, self.scale_y, origin=(0, 0))
+        mask_h, mask_w = mask.shape[:2]
+        sx = mask_w / self.patch_size[1]
+        sy = mask_h / self.patch_size[0]
+        trans_x = mask_w / 2
+        trans_y = mask_h / 2
+        line_ego = affinity.scale(line_ego, sx, sy, origin=(0, 0))
         line_ego = affinity.affine_transform(line_ego, [1.0, 0.0, 0.0, 1.0, trans_x, trans_y])
-        # print(np.array(list(line_ego.coords), dtype=np.int32).shape)
         coords = np.array(list(line_ego.coords), dtype=np.int32)[:, :2]
         coords = coords.reshape((-1, 2))
         assert len(coords) >= 2
@@ -1135,13 +1153,52 @@ class CustomNuScenesOfflineLocalMapDataset(CustomNuScenesDataset):
         example['gt_labels_3d'] = DC(gt_vecs_label, cpu_only=False)
         example['gt_bboxes_3d'] = DC(gt_vecs_pts_loc, cpu_only=True)
 
-        # gt_seg_mask = to_tensor(anns_results['gt_semantic_mask'])
-        # gt_pv_seg_mask = to_tensor(anns_results['gt_pv_semantic_mask'])
         if anns_results['gt_semantic_mask'] is not None:
             example['gt_seg_mask'] = DC(to_tensor(anns_results['gt_semantic_mask']), cpu_only=False)
         if anns_results['gt_pv_semantic_mask'] is not None:
-            example['gt_pv_seg_mask'] = DC(to_tensor(anns_results['gt_pv_semantic_mask']), cpu_only=False) 
+            example['gt_pv_seg_mask'] = DC(to_tensor(anns_results['gt_pv_semantic_mask']), cpu_only=False)
+        if anns_results.get('gt_high_res_semantic_mask') is not None:
+            example['gt_high_res_seg_mask'] = DC(
+                to_tensor(anns_results['gt_high_res_semantic_mask'].astype(np.float32)),
+                cpu_only=False)
+            self._save_hires_vis(anns_results['gt_high_res_semantic_mask'],
+                                 anns_results.get('gt_semantic_mask'),
+                                 input_dict)
         return example
+
+    _vis_counter = 0
+
+    def _save_hires_vis(self, hires_mask, lores_mask, input_dict):
+        """Save high-res seg mask visualization (every 50 samples)."""
+        cls = type(self)
+        cls._vis_counter += 1
+        if cls._vis_counter % 50 != 1:
+            return
+        import os, cv2 as _cv2
+        vis_dir = os.path.join('work_dirs', 'vis_hires_seg')
+        os.makedirs(vis_dir, exist_ok=True)
+        token = input_dict.get('sample_idx', str(cls._vis_counter))[:16]
+        idx = cls._vis_counter
+
+        colors_bgr = [(0, 200, 0), (0, 255, 255), (255, 128, 0)]
+        C = hires_mask.shape[0]
+        h, w = hires_mask.shape[1], hires_mask.shape[2]
+
+        canvas = np.zeros((h, w, 3), dtype=np.uint8)
+        for c in range(min(C, len(colors_bgr))):
+            m = hires_mask[c] > 0
+            canvas[m] = colors_bgr[c]
+        _cv2.imwrite(os.path.join(vis_dir, f'{idx:06d}_{token}_hires.png'), canvas)
+
+        if lores_mask is not None:
+            lh, lw = lores_mask.shape[1], lores_mask.shape[2]
+            lo_canvas = np.zeros((lh, lw, 3), dtype=np.uint8)
+            for c in range(min(C, len(colors_bgr))):
+                m = lores_mask[c] > 0
+                lo_canvas[m] = colors_bgr[c]
+            lo_up = _cv2.resize(lo_canvas, (w, h), interpolation=_cv2.INTER_NEAREST)
+            compare = np.concatenate([lo_up, canvas], axis=1)
+            _cv2.imwrite(os.path.join(vis_dir, f'{idx:06d}_{token}_compare.png'), compare)
 
     def prepare_train_data(self, index):
         """

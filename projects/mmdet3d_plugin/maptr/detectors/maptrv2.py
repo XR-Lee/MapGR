@@ -126,28 +126,15 @@ class MapTRv2(MVXTwoStageDetector):
                           prev_bev=None,
                           gt_depth=None,
                           gt_seg_mask=None,
-                          gt_pv_seg_mask=None,):
-        """Forward function'
-        Args:
-            pts_feats (list[torch.Tensor]): Features of point cloud branch
-            gt_bboxes_3d (list[:obj:`BaseInstance3DBoxes`]): Ground truth
-                boxes for each sample.
-            gt_labels_3d (list[torch.Tensor]): Ground truth labels for
-                boxes of each sampole
-            img_metas (list[dict]): Meta information of samples.
-            gt_bboxes_ignore (list[torch.Tensor], optional): Ground truth
-                boxes to be ignored. Defaults to None.
-            prev_bev (torch.Tensor, optional): BEV features of previous frame.
-        Returns:
-            dict: Losses of each branch.
-        """
+                          gt_pv_seg_mask=None,
+                          gt_high_res_seg_mask=None,):
+        """Forward function"""
 
         outs = self.pts_bbox_head(
             pts_feats, lidar_feat, img_metas, prev_bev)
 
         depth = outs.pop('depth')
         losses = dict()
-        # calculate depth loss
         if gt_depth is not None and depth is not None:
             loss_depth = self.pts_bbox_head.transformer.encoder.get_depth_loss(gt_depth, depth)
             if digit_version(TORCH_VERSION) >= digit_version('1.8'):
@@ -155,7 +142,9 @@ class MapTRv2(MVXTwoStageDetector):
             losses.update(loss_depth=loss_depth)
 
         loss_inputs = [gt_bboxes_3d, gt_labels_3d, gt_seg_mask, gt_pv_seg_mask, outs]
-        losses_pts = self.pts_bbox_head.loss(*loss_inputs, img_metas=img_metas, one_to_many=False)
+        losses_pts = self.pts_bbox_head.loss(*loss_inputs, img_metas=img_metas,
+                                             one_to_many=False,
+                                             gt_high_res_seg_mask=gt_high_res_seg_mask)
         losses.update(losses_pts)
         # import ipdb;ipdb.set_trace()
         k_one2many = self.pts_bbox_head.k_one2many
@@ -272,6 +261,7 @@ class MapTRv2(MVXTwoStageDetector):
                       gt_depth=None,
                       gt_seg_mask=None,
                       gt_pv_seg_mask=None,
+                      gt_high_res_seg_mask=None,
                       ):
         """Forward training function.
         Args:
@@ -314,7 +304,9 @@ class MapTRv2(MVXTwoStageDetector):
         losses = dict()
         losses_pts = self.forward_pts_train(img_feats, lidar_feat, gt_bboxes_3d,
                                             gt_labels_3d, img_metas,
-                                            gt_bboxes_ignore, prev_bev, gt_depth,gt_seg_mask,gt_pv_seg_mask)
+                                            gt_bboxes_ignore, prev_bev, gt_depth,
+                                            gt_seg_mask, gt_pv_seg_mask,
+                                            gt_high_res_seg_mask)
 
         losses.update(losses_pts)
         return losses

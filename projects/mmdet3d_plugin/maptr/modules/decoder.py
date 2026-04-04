@@ -126,58 +126,59 @@ class MapTRDecoder(TransformerLayerSequence):
         
         self.global_dec_guide = []
         self.global_dec_guide_offest = []
+        self.hires_layer_idx = 2
         for i in range(6):            
             global_decoder = nn.Sequential(
                     nn.LayerNorm(256),
                     nn.Linear(256, 512),
                     nn.LeakyReLU(),
-                    # nn.Dropout(p=0.1),
                     nn.Linear(512, 512),
                     nn.LeakyReLU(),
-                    # nn.Dropout(p=0.1),
                     nn.Linear(512, 2048))
             
-            # global_guide = nn.Sequential(
-            #         nn.Linear(127*63*3, 512),
-            #         nn.LeakyReLU(),
-            #         # nn.Dropout(p=0.1),
-            #         nn.Linear(512, 512))
+            global_guide = nn.Sequential(
+                    nn.Linear(127*63*3, 512),
+                    nn.LeakyReLU(),
+                    nn.Linear(512, 512))
             
-            # global_guide_off = nn.Sequential(
-            #         nn.Linear(512 + 256, 512),
-            #         nn.LeakyReLU(),
-            #         # nn.Dropout(p=0.1),
-            #         nn.Linear(512, 256))
+            global_guide_off = nn.Sequential(
+                    nn.Linear(512 + 256, 512),
+                    nn.LeakyReLU(),
+                    nn.Linear(512, 256))
             
             global_map = nn.Sequential(
                     nn.ConvTranspose2d(100,32,kernel_size=3, stride=2,padding=1),
-                    # nn.BatchNorm2d(32), 
-                    #nn.BatchNorm2d(32),
                     nn.LeakyReLU(),
-                    #nn.ConvTranspose2d(32,32,kernel_size=3, stride=2,padding=1),
                     nn.Conv2d(32,32,kernel_size=3,padding=1),
-                    # nn.BatchNorm2d(32),
-                    #nn.LayerNorm(1024),
                     nn.LeakyReLU(),
                     nn.Conv2d(32,3,kernel_size=3,padding=1))
-            
-            # global_map = nn.Sequential(
-            #         nn.Conv2d(50,32,kernel_size=3, stride=2,padding=1),
-            #         #nn.BatchNorm2d(32),
-            #         nn.LeakyReLU(),
-            #         nn.Conv2d(32,32,kernel_size=3, stride=2,padding=1),
-            #         #nn.LayerNorm(1024),
-            #         nn.LeakyReLU(),
-            #         nn.Conv2d(32,1,kernel_size=3,padding=1))
 
             self.global_dec.append(global_decoder)
             self.global_map.append(global_map)
-            # self.global_dec_guide.append(global_guide)
-            # self.global_dec_guide_offest.append(global_guide_off)
+            self.global_dec_guide.append(global_guide)
+            self.global_dec_guide_offest.append(global_guide_off)
         self.global_dec = nn.ModuleList(self.global_dec)
         self.global_map = nn.ModuleList(self.global_map)
-        # self.global_dec_guide = nn.ModuleList(self.global_dec_guide)
-        # self.global_dec_guide_offest = nn.ModuleList(self.global_dec_guide_offest)
+
+        self.hires_dec = nn.Sequential(
+            nn.LayerNorm(256),
+            nn.Linear(256, 1024),
+            nn.LeakyReLU(),
+            nn.Linear(1024, 2048),
+            nn.LeakyReLU(),
+            nn.Linear(2048, 8192),
+        )
+        self.hires_map = nn.Sequential(
+            nn.ConvTranspose2d(100, 64, kernel_size=3, stride=2, padding=1),
+            nn.LeakyReLU(),
+            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1),
+            nn.LeakyReLU(),
+            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1),
+            nn.LeakyReLU(),
+            nn.Conv2d(16, 3, kernel_size=3, padding=1),
+        )
+        self.global_dec_guide = nn.ModuleList(self.global_dec_guide)
+        self.global_dec_guide_offest = nn.ModuleList(self.global_dec_guide_offest)
         self.detach_weights = detach_weights
         self.queru_mask_num = queru_mask_num
         # self.mask_emb = nn.Sequential(
@@ -221,6 +222,7 @@ class MapTRDecoder(TransformerLayerSequence):
         intermediate = []
         intermediate_reference_points = []
         global_map_rec = []
+        global_map_hires = None
         bs = reference_points.shape[0]
         for lid, layer in enumerate(self.layers):
             if self.query_pos_embedding == 'instance':
@@ -268,13 +270,13 @@ class MapTRDecoder(TransformerLayerSequence):
             global_map = self.global_dec[ii](tmp)    
 
             global_map = self.global_map[ii](global_map.view(-1,100,64,32))
-            global_map_rec.append(F.interpolate(global_map, (200,100), mode='bilinear'))
+            global_map_lo = F.interpolate(global_map, (200,100), mode='bilinear')
+            global_map_rec.append(global_map_lo)
 
-
-            # av2
-            # global_map = self.global_map[ii](global_map.view(-1,100,32,64))
-            # global_map_rec.append(F.interpolate(global_map, (100,200), mode='bilinear'))
-            # av2 
+            if ii == self.hires_layer_idx:
+                hires_feat = self.hires_dec(tmp)
+                hires_feat = self.hires_map(hires_feat.view(-1, 100, 128, 64))
+                global_map_hires = F.interpolate(hires_feat, (800, 400), mode='bilinear')
             
 
             
@@ -300,9 +302,9 @@ class MapTRDecoder(TransformerLayerSequence):
 
         if self.return_intermediate:
             return torch.stack(intermediate), torch.stack(
-                intermediate_reference_points), global_map_rec
+                intermediate_reference_points), global_map_rec, global_map_hires
 
-        return output, reference_points, global_map_rec
+        return output, reference_points, global_map_rec, global_map_hires
 
 
 @ATTENTION.register_module()

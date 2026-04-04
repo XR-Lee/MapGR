@@ -377,7 +377,7 @@ class MapTRv2Head(DETRHead):
                 num_pts_per_vec=self.num_pts_per_vec,
         )
 
-        bev_embed,depth, hs, init_reference, inter_references,global_map_rec = outputs
+        bev_embed,depth, hs, init_reference, inter_references,global_map_rec, global_map_hires = outputs
         hs = hs.permute(0, 2, 1, 3)
         outputs_classes_one2one = []
         outputs_coords_one2one = []
@@ -485,6 +485,7 @@ class MapTRv2Head(DETRHead):
             'seg': outputs_seg,
             'pv_seg': outputs_pv_seg,
             'global_map_rec': global_map_rec,
+            'global_map_hires': global_map_hires,
             "one2many_outs": dict(
                 all_cls_scores=outputs_classes_one2many,
                 all_bbox_preds=outputs_coords_one2many,
@@ -806,7 +807,8 @@ class MapTRv2Head(DETRHead):
              preds_dicts,
              gt_bboxes_ignore=None,
              one_to_many=False,
-             img_metas=None):
+             img_metas=None,
+             gt_high_res_seg_mask=None):
         """"Loss function.
         Args:
 
@@ -846,6 +848,7 @@ class MapTRv2Head(DETRHead):
         enc_bbox_preds = preds_dicts['enc_bbox_preds']
         enc_pts_preds  = preds_dicts['enc_pts_preds']
         global_map_rec = preds_dicts['global_map_rec']
+        global_map_hires = preds_dicts.get('global_map_hires', None)
 
         num_dec_layers = len(all_cls_scores)
         device = gt_labels_list[0].device
@@ -890,7 +893,7 @@ class MapTRv2Head(DETRHead):
             all_gt_bboxes_list, all_gt_labels_list,all_gt_shifts_pts_list,
             all_gt_bboxes_ignore_list)
         
-        weight_layer = [1.,1.,0.0,0.0,0.0,0.0]
+        weight_layer = [1.,1.,1.,0.0,0.0,0.0]
         loss_dict = dict()
         if self.aux_seg['use_aux_seg']:
             # import ipdb;ipdb.set_trace()
@@ -922,6 +925,12 @@ class MapTRv2Head(DETRHead):
 
                     loss_seg = self.loss_seg(seg_output, seg_gt.max(dim=1,keepdim=True)[0].float())
                     loss_dict['loss_seg'] = loss_seg
+
+                    if global_map_hires is not None and gt_high_res_seg_mask is not None and (not one_to_many):
+                        hires_gt = torch.stack([gt_high_res_seg_mask[i] for i in range(num_imgs)], dim=0)
+                        print(f"hires pred={global_map_hires.shape} gt={hires_gt.shape}")
+                        loss_hires = self.loss_seg(global_map_hires, hires_gt.float())
+                        loss_dict['loss_hires_seg'] = loss_hires
             if self.aux_seg['pv_seg']:
                 # import ipdb;ipdb.set_trace()
                 if preds_dicts['pv_seg'] is not None:

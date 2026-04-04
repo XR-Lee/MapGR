@@ -354,4 +354,4 @@ log_config = dict(
     ])
 fp16 = dict(loss_scale=512.)
 checkpoint_config = dict(max_keep_ckpts=1, interval=1)
-# find_unused_parameters=True
+find_unused_parameters=True

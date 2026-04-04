@@ -413,7 +413,7 @@ class MapTRPerceptionTransformer(BaseModule):
         feat_flatten, feat_spatial_shapes, feat_level_start_index \
             = self.format_feats(mlvl_feats)
 
-        inter_states, inter_references,global_map_rec = self.decoder(
+        inter_states, inter_references, global_map_rec, global_map_hires = self.decoder(
             query=query,
             key=None,
             value=bev_embed,
@@ -431,4 +431,4 @@ class MapTRPerceptionTransformer(BaseModule):
 
         inter_references_out = inter_references
 
-        return bev_embed, depth, inter_states, init_reference_out, inter_references_out, global_map_rec
+        return bev_embed, depth, inter_states, init_reference_out, inter_references_out, global_map_rec, global_map_hires
