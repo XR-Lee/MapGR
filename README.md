@@ -126,7 +126,7 @@ Where each part lives (`projects/mmdet3d_plugin/maptr/` in both sub-projects):
 How the code applies them:
 
 - GRL and GRG run after **every** decoder layer (all 6).
-- The global-map loss supervises only the first two layers (per-layer weights `[1, 1, 0, 0, 0, 0]`). In later layers, the global map only feeds GRG.
+- The global-map loss supervises only the first two layers (`global_map_loss_weights=[1, 1, 0, 0, 0, 0]` in the head config). In later layers, the global map only feeds GRG.
 - The global map is a single channel (union of all map classes) at 200 × 100.
 
 Settings that differ between the two sub-projects:
@@ -135,7 +135,7 @@ Settings that differ between the two sub-projects:
 |---|---|---|
 | Queries aggregated by GRL | `queru_mask_num=700`: the 100 one-to-one plus 600 one-to-many queries | the 50 one-to-one instances (point queries mean-pooled) |
 | Gradient weakening, detached / attached share | `detach_weights=[0.9, 0.1]` | `0.8 / 0.2` (hard-coded) |
-| Detection-loss weight on early one-to-one decoder layers | 0.1 on layers 1–3 | 0.1 on layers 1–2 |
+| Detection-loss weight on early one-to-one decoder layers (`aux_loss_weights`) | 0.05 on layers 1–2 | 0.1 on layers 1–2 |
 
 Inference with the released MapQR checkpoint:
 

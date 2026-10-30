@@ -88,6 +88,14 @@ class MapTRv2Head(DETRHead):
         transformer (obj:`ConfigDict`): ConfigDict is used for building
             the Encoder and Decoder.
         bev_h, bev_w (int): spatial shape of BEV queries.
+        aux_loss_weights (list[float], optional): detection-loss weights of
+            the intermediate (non-last) decoder layers for the one-to-one
+            queries. None means 1.0 for every layer.
+        aux_loss_weights_one2many (list[float], optional): the same for the
+            one-to-many queries.
+        global_map_loss_weights (list[float], optional): MapGR global-map
+            loss weight of each predicted global map. None means 1.0 for
+            every map.
     """
 
     def __init__(self,
@@ -132,6 +140,9 @@ class MapTRv2Head(DETRHead):
                               pos_weight=2.13,
                               loss_weight=1.0),
                  loss_dir=dict(type='PtsDirCosLoss', loss_weight=2.0),
+                 aux_loss_weights=None,
+                 aux_loss_weights_one2many=None,
+                 global_map_loss_weights=None,
                  **kwargs):
 
         self.bev_h = bev_h
@@ -173,7 +184,10 @@ class MapTRv2Head(DETRHead):
         self.dir_interval = dir_interval
         self.aux_seg = aux_seg
         self.z_cfg = z_cfg
-        
+        self.aux_loss_weights = aux_loss_weights
+        self.aux_loss_weights_one2many = aux_loss_weights_one2many
+        self.global_map_loss_weights = global_map_loss_weights
+
         super(MapTRv2Head, self).__init__(
             *args, transformer=transformer, **kwargs)
         self.code_weights = nn.Parameter(torch.tensor(
@@ -907,7 +921,6 @@ class MapTRv2Head(DETRHead):
             all_gt_bboxes_list, all_gt_labels_list,all_gt_shifts_pts_list,
             all_gt_bboxes_ignore_list)
 
-        weight_layer = [1.,1.,0.0,0.0,0.0,0.0]
         loss_dict = dict()
         if self.aux_seg['use_aux_seg']:
             # import ipdb;ipdb.set_trace()
@@ -923,12 +936,15 @@ class MapTRv2Head(DETRHead):
                         # seg_gt_low_res = seg_gt_low_res.float()
                         #seg_gt_mask = F.interpolate(seg_gt_mask, (64,32), mode='nearest')
 
-                        
+                        num_maps = sum(global_map is not None for global_map in global_map_rec)
+                        global_weights = self.global_map_loss_weights or [1.0] * num_maps
+                        assert len(global_weights) == num_maps, \
+                            f'expected {num_maps} global_map_loss_weights, got {len(global_weights)}'
                         layer_count = 0
                         for global_map in global_map_rec:
                             #print(global_map.shape, seg_gt_mask.shape, " <> " * 4)
                             if global_map is not None:
-                                loss_dict['loss_global_map_' + str(layer_count)] = self.loss_seg(global_map, seg_gt.float()) * weight_layer[layer_count]
+                                loss_dict['loss_global_map_' + str(layer_count)] = self.loss_seg(global_map, seg_gt.float()) * global_weights[layer_count]
                                 layer_count += 1
                             
                             # rand_id = np.random.randint(10000)
@@ -972,10 +988,10 @@ class MapTRv2Head(DETRHead):
         loss_dict['loss_pts'] = losses_pts[-1]
         loss_dict['loss_dir'] = losses_dir[-1]
         # loss from other decoder layers
-        if one_to_many:
-            weight_layer = [1.,1.,1.0,1.0,1.0,1.0]
-        else:
-            weight_layer = [.1,.1,1.0,1.0,1.0,1.0]
+        weight_layer = self.aux_loss_weights_one2many if one_to_many else self.aux_loss_weights
+        weight_layer = weight_layer or [1.0] * (num_dec_layers - 1)
+        assert len(weight_layer) == num_dec_layers - 1, \
+            f'expected {num_dec_layers - 1} aux loss weights, got {len(weight_layer)}'
         num_dec_layer = 0
         for loss_cls_i, loss_bbox_i, loss_iou_i, loss_pts_i, loss_dir_i in zip(losses_cls[:-1],
                                            losses_bbox[:-1],

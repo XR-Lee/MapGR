@@ -187,7 +187,12 @@ model = dict(
             loss_weight=1.0),
         loss_pv_seg=dict(type='SimpleLoss', 
                     pos_weight=1.0,
-                    loss_weight=2.0),),
+                    loss_weight=2.0),
+        # detection-loss weights of decoder layers 1-5 (the last layer always has weight 1.0)
+        aux_loss_weights=[0.1, 0.1, 1.0, 1.0, 1.0],
+        aux_loss_weights_one2many=[1.0, 1.0, 1.0, 1.0, 1.0],
+        # global-map loss weight of each decoder layer: only the first two layers are supervised
+        global_map_loss_weights=[1.0, 1.0, 0.0, 0.0, 0.0, 0.0]),
     # model training and testing settings
     train_cfg=dict(pts=dict(
         grid_size=[512, 512, 1],
