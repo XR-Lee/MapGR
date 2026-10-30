@@ -1,91 +1,167 @@
-<div align="center">
-<h1>MapQR</h1>
-<h3>Leveraging Enhanced Queries of Point Sets for Vectorized Map Construction</h3>
+# MapGR: Learning Global Representation from Queries for Vectorized HD Map Construction
 
-Zihao Liu<sup>1*</sup>, 
-[Xiaoyu Zhang](https://fishmarch.github.io)<sup>2*</sup>, 
-Guangwei Liu<sup>3*</sup>,
-[Ji Zhao](https://sites.google.com/site/drjizhao/)<sup>3#</sup>,
-[Ningyi Xu](http://www.qingyuan.sjtu.edu.cn/a/xu-ning-yi-1.html)<sup>1#</sup>
+**ICML 2026** · [arXiv:2510.06969](https://arxiv.org/abs/2510.06969) · [Project page](https://xr-lee.github.io/mapgr-demo/) · [Model weights (Hugging Face)](https://huggingface.co/Lee1413/MapGR)
 
-<sup>1</sup> Shanghai Jiao Tong University, 
-<sup>2</sup> The Chinese University of Hong Kong, 
-<sup>3</sup> Huixi Technology
+Shoumeng Qiu\*, Xinrun Li\*, Yang Long, Xiangyang Xue, Varun Ojha, Jian Pu (\* equal contribution)
 
-<sup>*</sup>Equal contribution. <sup>#</sup>Corresponding author.
+MapGR adds two modules to DETR-style vectorized HD-map decoders:
 
-ArXiv Preprint ([arXiv 2402.17430](https://arxiv.org/abs/2402.17430))
+- **Global Representation Learning (GRL):** aggregates all instance queries into a holistic BEV segmentation, supervised by the rasterized ground-truth map. Every query receives a gradient, whether or not it was matched.
+- **Global Representation Guidance (GRG):** feeds the predicted global map back to each query as global context.
 
-Accepted by **ECCV 2024**
+MapGR is a plug-in for DETR-style map decoders. This repository contains the [MapTRv2](https://github.com/hustvl/MapTR/tree/maptrv2) and [MapQR](https://github.com/HXMap/MapQR) variants.
 
-</div>
+## Repository layout
 
-## 🔥 News
-- *2024.08*: &nbsp;🎉🎉 Our new work [HRMapNet](https://github.com/HXMap/HRMapNet) is now released, it utilizes historical information to enhance HD map construction!
-- *2024.07*: &nbsp;🎉🎉 MapQR is accepted in ECCV 2024! 
+| Directory | Contents |
+|---|---|
+| `mapqr/` | MapQR + MapGR. The released checkpoint comes from this code. |
+| `maptr/` | MapTRv2 + MapGR. This is the code behind the paper's MapTRv2 results. |
+| `mmdetection3d/` | mmdetection3d v0.17.2, the copy bundled with MapTR and MapQR. Both sub-projects share it. |
 
-## Overview
-![pipeline](assets/pipeline.jpg "pipeline")
-This project introduces MapQR, an end-to-end method with an emphasis on enhancing query capabilities for constructing online vectorized maps.
-Although the map construction is essentially a point set prediction task, MapQR utilizes instance queries rather than point queries. 
-These instance queries are scattered for the prediction of point sets and subsequently gathered for the final matching. 
-This query design, called the scatter-and-gather query, shares content information in the same map element and avoids possible inconsistency
-of content information in point queries. 
-We further exploit prior information to enhance an instance query by adding positional information embedded from their reference points. 
-Together with a simple and effective improvement of a BEV encoder, the proposed MapQR achieves the best mean average precision (mAP) and maintains good efficiency on both nuScenes and Argoverse 2. 
+The two sub-projects are self-contained MapTR-style code bases with their own `projects/` and `tools/`. Run every command from inside the sub-project directory.
 
-The main contribution is the proposed scatter-and-gather query, illustrated in the following figure.
-<div  align="center"> 
-<img src="assets/decoder.jpg" width = "500">
-</div>
+## Results and models (nuScenes val)
 
-## Models
+mAP<sub>2</sub> averages AP over Chamfer thresholds {0.5, 1.0, 1.5} m; mAP<sub>1</sub> averages over {0.2, 0.5, 1.0} m.
 
-#### nuScenes dataset
+| Method | Epochs | Paper mAP<sub>1</sub> / mAP<sub>2</sub> | Released model mAP<sub>1</sub> / mAP<sub>2</sub> | Config | Weights |
+|---|---|---|---|---|---|
+| MapQR + MapGR | 24 | 45.3 / 68.1 | 44.87 / 67.96 | [config](mapqr/projects/configs/mapgr/mapqr_mapgr_nusc_r50_24ep.py) | [HF](https://huggingface.co/Lee1413/MapGR/blob/main/mapqr_mapgr_nusc_r50_24ep.pth) |
+| MapTRv2 + MapGR | 24 | 41.1 / 65.0 | – | [config](maptr/projects/configs/maptrv2/maptrv2_nusc_r50_24ep.py) | – |
 
-| Method  | Backbone | Epoch | mAP1 | mAP2 |                         Config                          |                                                                   Download                                                                   |
-|:-------:|:--------:|:-----:|:----:|:----:|:-------------------------------------------------------:|:--------------------------------------------------------------------------------------------------------------------------------------------:|
-|  MapQR  |   R50    |  24   | 43.3 | 66.4 | [config](projects/configs/mapqr/mapqr_nusc_r50_24ep.py) | [model](https://mycuhk-my.sharepoint.com/:u:/g/personal/1155168294_link_cuhk_edu_hk/EXrwWu0yvz5Ap_aU9FFb4x8BahsKfdFgYW7TgnpsIKho2Q?e=s2CnGT) |
-|  MapQR  |   R50    |  110  | 50.5 | 72.6 | [config](projects/configs/mapqr/mapqr_nusc_r50_24ep.py) | [model](https://mycuhk-my.sharepoint.com/:u:/g/personal/1155168294_link_cuhk_edu_hk/EV-zT_ZOIaNEvOCMNuEqjIAB2GnV8HzR-cfskRmdOJcBPQ?e=uOefF4) |
+Notes:
 
-#### Argoverse 2 dataset
+- **The released MapQR + MapGR checkpoint is a re-training, not the run reported in the paper.**
+  - It was trained with the research code this repository was cleaned up from. Evaluating it with this repository gives the numbers in the table, bit-identical to evaluating it with the original code.
+  - It was trained on 8 GPUs × 4 samples (total batch size 32) with fp16.
+  - The numbers in the table come from evaluating the released file with `tools/test.py`.
+  - Other 24-epoch runs of closely related configurations (different seeds, loss weights and query counts) reached 67.2–68.0 mAP<sub>2</sub>.
+- The MapTRv2 + MapGR config is the one used for the paper's 24-epoch result. We do not release weights for it.
+- Not part of this release yet:
+  - MapTR (v1) + MapGR;
+  - the 110-epoch settings;
+  - Argoverse 2.
 
-| Method  | Backbone | Epoch | dim  | mAP1 | mAP2 |                         Config                          |                                                                   Download                                                                   |
-|:-------:|:--------:|:-----:|:----:|:----:|:----:|:-------------------------------------------------------:|:--------------------------------------------------------------------------------------------------------------------------------------------:|
-|  MapQR  |   R50    |   6   |  2   | 44.8 | 68.1 | [config](projects/configs/mapqr/mapqr_av2_r50_6ep.py) | [model](https://mycuhk-my.sharepoint.com/:u:/g/personal/1155168294_link_cuhk_edu_hk/EanLLdOtaTZLkE-aKrSy-VcB5Vh4mxfERRtno7qi4efIUg?e=ISTrRn) |
-|  MapQR  |   R50    |   6   |  3   | 41.2 | 65.4 | [config](projects/configs/mapqr/mapqr_av2_3d_r50_6ep.py) | [model](https://mycuhk-my.sharepoint.com/:u:/g/personal/1155168294_link_cuhk_edu_hk/EXXCw8AnArtDl7-1lWHh_1ABBwob12MeIfLEzQOPr2MpZg?e=2vXhWl) |
+## Installation
 
+The environment follows MapTR / MapQR:
 
+```shell
+conda create -n mapgr python=3.8 -y
+conda activate mapgr
+pip install torch==1.9.1+cu111 torchvision==0.10.1+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+pip install mmcv-full==1.4.0 -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9.0/index.html
+pip install mmdet==2.14.0 mmsegmentation==0.14.1 timm
 
-- mAP1 is measured under the thresholds { 0.2, 0.5, 1.0 }
-- mAP2 is measured under the thresholds { 0.5, 1.0, 1.5 }
+git clone <this repo> MapGR && cd MapGR
+cd mmdetection3d && python setup.py develop && cd ..
 
-## Getting Started
-These settings keep the same as [MapTRv2](https://github.com/hustvl/MapTR/tree/maptrv2)
-- [Installation](docs/install.md)
-- [Prepare Dataset](docs/prepare_dataset.md)
-- [Train and Eval](docs/train_eval.md)
-- [Visualization](docs/visualization.md)
+# Geometric kernel attention op. The two copies are identical, so building one is enough.
+cd mapqr/projects/mmdet3d_plugin/maptr/modules/ops/geometric_kernel_attn && python setup.py build install && cd -
 
+pip install -r mapqr/requirement.txt
+```
+
+The pinned versions above are those of the official MapTR / MapQR environment.
+
+The released checkpoint was trained and evaluated with a newer stack: PyTorch 2.0.1, CUDA 11.8, mmcv-full 1.6.0 and mmdet 2.28.2. On that stack, the bundled mmdet3d v0.17.2 needs local compatibility patches:
+
+- relax its `mmcv` version check;
+- skip its point-cloud ops and spconv imports, which clash with the copies that ship in newer mmcv;
+- remove the `THC` includes from its CUDA ops.
+
+Pretrained backbone, needed in each sub-project you train:
+
+```shell
+mkdir -p ckpts && wget -P ckpts https://download.pytorch.org/models/resnet50-19c8e357.pth
+```
+
+## Data preparation
+
+1. Download the nuScenes v1.0 full dataset, the CAN bus expansion and the map expansion (v1.3) from [nuscenes.org](https://www.nuscenes.org/download).
+2. Place (or symlink) them as `data/nuscenes` and `data/can_bus` inside each sub-project.
+3. Generate the annotation files:
+
+```shell
+# produces nuscenes_map_infos_temporal_{train,val}.pkl
+python tools/maptrv2/custom_nusc_map_converter.py --root-path ./data/nuscenes --out-dir ./data/nuscenes \
+    --extra-tag nuscenes --version v1.0 --canbus ./data
+```
+
+The first evaluation writes the vectorized ground truth to `data/nuscenes/nuscenes_map_anns_val.json`, and later runs reuse it.
+
+## Training and evaluation
+
+MapQR + MapGR (inside `mapqr/`):
+
+```shell
+# train, 8 GPUs
+./tools/dist_train.sh projects/configs/mapgr/mapqr_mapgr_nusc_r50_24ep.py 8
+
+# evaluate the released checkpoint
+wget -P ckpts https://huggingface.co/Lee1413/MapGR/resolve/main/mapqr_mapgr_nusc_r50_24ep.pth
+./tools/dist_test_map.sh projects/configs/mapgr/mapqr_mapgr_nusc_r50_24ep.py ckpts/mapqr_mapgr_nusc_r50_24ep.pth 1
+```
+
+MapTRv2 + MapGR (inside `maptr/`):
+
+```shell
+./tools/dist_train.sh projects/configs/maptrv2/maptrv2_nusc_r50_24ep.py 8
+./tools/dist_test_map.sh projects/configs/maptrv2/maptrv2_nusc_r50_24ep.py work_dirs/maptrv2_nusc_r50_24ep/latest.pth 8
+```
+
+`tools/test.py` only supports the distributed launcher, so use `dist_test_map.sh` with 1 GPU for single-GPU evaluation.
+
+## Implementation notes
+
+Where each part lives (`projects/mmdet3d_plugin/maptr/` in both sub-projects):
+
+| Component | Code |
+|---|---|
+| GRL: query aggregation and global-map prediction | `MapTRDecoder.global_dec`, `.global_map` in `modules/decoder.py` |
+| GRG: global guidance added back to the queries | `MapTRDecoder.global_dec_guide`, `.global_dec_guide_offest` in `modules/decoder.py` |
+| Global-map loss | `loss_global_map_*` in `dense_heads/maptrv2_head.py` |
+
+How the code applies them:
+
+- GRL and GRG run after **every** decoder layer (all 6).
+- The global-map loss supervises only the first two layers (per-layer weights `[1, 1, 0, 0, 0, 0]`). In later layers, the global map only feeds GRG.
+- The global map is a single channel (union of all map classes) at 200 × 100.
+
+Settings that differ between the two sub-projects:
+
+| Setting | `mapqr/` (released checkpoint) | `maptr/` (MapTRv2) |
+|---|---|---|
+| Queries aggregated by GRL | `queru_mask_num=700`: the 100 one-to-one plus 600 one-to-many queries | the 50 one-to-one instances (point queries mean-pooled) |
+| Gradient weakening, detached / attached share | `detach_weights=[0.9, 0.1]` | `0.8 / 0.2` (hard-coded) |
+| Detection-loss weight on early one-to-one decoder layers | 0.1 on layers 1–3 | 0.1 on layers 1–2 |
+
+Inference with the released MapQR checkpoint:
+
+- All 700 queries run through the decoder.
+- The one-to-one and one-to-many groups are masked from each other in self-attention. They interact only through the global map.
+- Only the last layer's 100 one-to-one predictions are decoded, keeping the top 50.
+- Because `global_map` takes 700 query channels, this checkpoint cannot run with the one-to-one queries alone.
+
+## Citation
+
+```bibtex
+@inproceedings{qiu2026mapgr,
+  title     = {Learning Global Representation from Queries for Vectorized {HD} Map Construction},
+  author    = {Qiu, Shoumeng and Li, Xinrun and Long, Yang and Xue, Xiangyang and Ojha, Varun and Pu, Jian},
+  booktitle = {International Conference on Machine Learning (ICML)},
+  year      = {2026}
+}
+```
 
 ## Acknowledgements
 
-MapQR is mainly based on [MapTRv2](https://github.com/hustvl/MapTR/tree/maptrv2). 
+This code builds on:
 
-It is also greatly inspired by the following outstanding contributions to the open-source community:
-[BEVFormer](https://github.com/fundamentalvision/BEVFormer),
-[GKT](https://github.com/hustvl/GKT), 
-[ConditionalDETR](https://github.com/Atten4Vis/ConditionalDETR),
-[DAB-DETR](https://github.com/IDEA-Research/DAB-DETR).
+- [MapTR / MapTRv2](https://github.com/hustvl/MapTR)
+- [MapQR](https://github.com/HXMap/MapQR)
+- [BEVFormer](https://github.com/fundamentalvision/BEVFormer)
+- [mmdetection3d](https://github.com/open-mmlab/mmdetection3d)
 
-## Citation
-If you find MapQR is useful in your research or applications, 
-please consider giving us a star 🌟 and citing it by the following BibTeX entry.
-```bibtex
-@inproceedings{liu2024leveraging,
-  title={Leveraging Enhanced Queries of Point Sets for Vectorized Map Construction},
-  author={Liu, Zihao and Zhang, Xiaoyu and Liu, Guangwei and Zhao, Ji and Xu, Ningyi},
-  booktitle={European Conference on Computer Vision},
-  year={2024}
-}
-```
+The repository is released under the MIT license (see `LICENSE`). The bundled `mmdetection3d/` keeps its own Apache-2.0 license.
