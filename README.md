@@ -25,10 +25,10 @@ The two sub-projects are self-contained MapTR-style code bases with their own `p
 
 mAP<sub>2</sub> averages AP over Chamfer thresholds {0.5, 1.0, 1.5} m; mAP<sub>1</sub> averages over {0.2, 0.5, 1.0} m.
 
-| Method | Epochs | Paper mAP<sub>1</sub> / mAP<sub>2</sub> | Released model mAP<sub>1</sub> / mAP<sub>2</sub> | Config | Weights |
-|---|---|---|---|---|---|
-| MapQR + MapGR | 24 | 45.3 / 68.1 | 44.87 / 67.96 | [config](mapqr/projects/configs/mapgr/mapqr_mapgr_nusc_r50_24ep.py) | [HF](https://huggingface.co/Lee1413/MapGR/blob/main/mapqr_mapgr_nusc_r50_24ep.pth) |
-| MapTRv2 + MapGR | 24 | 41.1 / 65.0 | – | [config](maptr/projects/configs/maptrv2/maptrv2_nusc_r50_24ep.py) | – |
+| Method | Epochs | Paper mAP<sub>1</sub> / mAP<sub>2</sub> | Released model mAP<sub>1</sub> / mAP<sub>2</sub> | Config | Weights | Training log |
+|---|---|---|---|---|---|---|
+| MapQR + MapGR | 24 | 45.3 / 68.1 | 44.87 / 67.96 | [config](mapqr/projects/configs/mapgr/mapqr_mapgr_nusc_r50_24ep.py) | [HF](https://huggingface.co/Lee1413/MapGR/blob/main/mapqr_mapgr_nusc_r50_24ep.pth) | [log](https://huggingface.co/Lee1413/MapGR/blob/main/logs/mapqr_mapgr_nusc_r50_24ep/20260329_014512.log) |
+| MapTRv2 + MapGR | 24 | 41.1 / 65.0 | – | [config](maptr/projects/configs/maptrv2/maptrv2_nusc_r50_24ep.py) | – | [log](https://huggingface.co/Lee1413/MapGR/blob/main/logs/maptrv2_mapgr_nusc_r50_24ep/train.273710.log) (paper run) |
 
 Notes:
 
@@ -38,6 +38,9 @@ Notes:
   - The numbers in the table come from evaluating the released file with `tools/test.py`.
   - Other 24-epoch runs of closely related configurations (different seeds, loss weights and query counts) reached 67.2–68.0 mAP<sub>2</sub>.
 - The MapTRv2 + MapGR config is the one used for the paper's 24-epoch result. We do not release weights for it.
+  - Its training log is the paper's run: 4 GPUs × 4 samples (total batch size 16) with fp16, 64.98 mAP<sub>2</sub> at epoch 24.
+  - That log evaluates only the {0.5, 1.0, 1.5} m thresholds, so it gives no mAP<sub>1</sub>.
+- In the training logs, user names, host names and internal path prefixes are replaced with `<user>`, `<host>` and `<workspace>`. Nothing else is changed.
 - Not part of this release yet:
   - MapTR (v1) + MapGR;
   - the 110-epoch settings;
@@ -107,7 +110,8 @@ wget -P ckpts https://huggingface.co/Lee1413/MapGR/resolve/main/mapqr_mapgr_nusc
 MapTRv2 + MapGR (inside `maptr/`):
 
 ```shell
-./tools/dist_train.sh projects/configs/maptrv2/maptrv2_nusc_r50_24ep.py 8
+# train, 4 GPUs (as in the paper's run)
+./tools/dist_train.sh projects/configs/maptrv2/maptrv2_nusc_r50_24ep.py 4
 ./tools/dist_test_map.sh projects/configs/maptrv2/maptrv2_nusc_r50_24ep.py work_dirs/maptrv2_nusc_r50_24ep/latest.pth 8
 ```
 
