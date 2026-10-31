@@ -54,7 +54,7 @@ pip install torch==1.9.1+cu111 torchvision==0.10.1+cu111 -f https://download.pyt
 pip install mmcv-full==1.4.0 -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9.0/index.html
 pip install mmdet==2.14.0 mmsegmentation==0.14.1 timm
 
-git clone <this repo> MapGR && cd MapGR
+git clone https://github.com/XR-Lee/MapGR.git && cd MapGR
 cd mmdetection3d && python setup.py develop && cd ..
 
 # Geometric kernel attention op. The two copies are identical, so building one is enough.
